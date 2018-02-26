@@ -1,4 +1,4 @@
-const SVM = require('ml-svm')
+const KNN = require('ml-knn')
 const path = require('path')
 const csv = require('fast-csv')
 const fs = require('fs')
@@ -23,7 +23,8 @@ const streamHandler = stream => {
           }
         })
         if (!trigger) {
-          resultData.push(data.splice(1, 21))
+          const formattedData = data.map(d => parseFloat(d))
+          resultData.push(formattedData.splice(1, 21))
         }
       })
       .on('end', () => {
@@ -32,11 +33,16 @@ const streamHandler = stream => {
   })
 }
 
-async function main () {
-  const goodFiles = ['post_1', 'post_2']
-  const badFiles = ['pre_1', 'pre_2']
+async function main() {
+  const goodFiles = ['post_1', 'post_2', 'post_3', 'post_4', 'post_5', 'post_6']
+  const badFiles = ['pre_1', 'pre_2', 'pre_3', 'pre_4', 'pre_5', 'pre_6']
 
-  const testFiles = ['pre_3', 'post_3', 'post_4', 'pre_4']
+  const testFiles = [
+    'KP_hungry_3',
+    'KP_hungry_4',
+    'KP_hungryNO_3',
+    'KP_hungryNO_4',
+  ]
 
   const goodFilesStream = goodFiles.map(e => fileStream(e))
   const badFilesStream = badFiles.map(e => fileStream(e))
@@ -71,30 +77,21 @@ async function main () {
   const trainData = [...goodClean, ...badClean]
   const trainingPoints = [
     ...makeArray(goodClean, 1),
-    ...makeArray(badClean, -1)
+    ...makeArray(badClean, -1),
   ]
 
-  const options = {
-    C: 0.5,
-    tol: 10e-4,
-    maxPasses: 10,
-    maxIterations: 10000,
-    kernel: 'rbf',
-    kernelOptions: {
-      sigma: 0.5
-    }
-  }
-
-  const svm = new SVM(options)
-  svm.train(trainData, trainingPoints)
+  const knn = new KNN(trainData, trainingPoints)
+  fs.writeFile('model.json', JSON.stringify(knn.toJSON()), err => {
+    console.log('error', err)
+  })
 
   const reduce = a => a.reduce((x, z) => x + z)
-  const predict = x => x.map(el => svm.predict(el))
+  const predict = x => x.map(el => console.log(el) || knn.predict(el))
 
   const confidence = d => reduce(predict(d)) / d.length
 
   testFilesData.forEach((t, i) => {
-    console.log(`TEST ${i}: `, confidence(testFilesData[i]))
+    console.log(`TEST ${i + 1}: `, confidence(testFilesData[i]))
   })
 }
 
